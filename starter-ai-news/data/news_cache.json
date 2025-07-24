@@ -1,0 +1,304 @@
+[
+  {
+    "timestamp": "2025-07-23T20:14:00Z",
+    "title": {
+      "en": "US & UK governments bet billions on chatbots and AI strategy",
+      "fr": "Les gouvernements américain et britannique misent des milliards sur les chatbots et la stratégie de l'IA"
+    },
+    "summary": {
+      "en": "OpenAI teams up with the UK as xAI scores $200M Pentagon deal",
+      "fr": "OpenAI s'associe au Royaume-Uni et xAI signe un contrat de 200 millions de dollars avec le Pentagone"
+    },
+    "url": "https://www.windowscentral.com/artificial-intelligence/openai-signs-uk-government-deal-while-xai-lands-u-s-defense-contract",
+    "categories": [
+      "Company"
+    ]
+  },
+  {
+    "timestamp": "2025-07-23T18:16:34Z",
+    "title": {
+      "en": "OpenAI's Sam Altman Warns of Impending AI-Powered Fraud Crisis",
+      "fr": "Sam Altman, d'OpenAI, met en garde contre une crise imminente de fraude alimentée par l'IA"
+    },
+    "summary": {
+      "en": "OpenAI CEO Sam Altman warns of an imminent AI fraud crisis, particularly targeting financial institutions using voice authentication.",
+      "fr": "Le PDG d'OpenAI, Sam Altman, met en garde contre une crise imminente de fraude à l'IA, ciblant particulièrement les institutions financières utilisant l'authentification vocale."
+    },
+    "url": "https://www.androidheadlines.com/2025/07/openai-sam-altman-warns-ai-fraud-crisis-voice.html",
+    "categories": [
+      "Company"
+    ]
+  },
+  {
+    "timestamp": "2025-07-23T17:40:18Z",
+    "title": {
+      "en": "Claude AI training leak reveals trusted and banned websites - here’s what it means for you",
+      "fr": "La fuite de formation Claude AI révèle des sites Web fiables et interdits : voici ce que cela signifie pour vous"
+    },
+    "summary": {
+      "en": "A leaked document reveals how gig workers fine-tuned Anthropic’s Claude using a mix of whitelisted and banned sources. Here's what it means for you.",
+      "fr": "Un document divulgué révèle comment des travailleurs indépendants ont optimisé Claude, d'Anthropic, en utilisant un mélange de sources autorisées et interdites. Voici ce que cela signifie pour vous."
+    },
+    "url": "https://www.tomsguide.com/ai/claude-ai-training-leak-reveals-trusted-and-banned-websites-heres-what-it-means-for-you",
+    "categories": [
+      "Model",
+      "Company"
+    ]
+  },
+  {
+    "timestamp": "2025-07-23T15:34:04Z",
+    "title": {
+      "en": "Microsoft snapped up dozens of Google DeepMind staffers in recent months: Report",
+      "fr": "Microsoft a recruté des dizaines de collaborateurs de Google DeepMind ces derniers mois : rapport"
+    },
+    "summary": {
+      "en": "The migration comes amid a rapidly intensifying war for AI talent, where researchers and engineers are being traded like star athletes.",
+      "fr": "Cette migration intervient dans un contexte de guerre croissante pour les talents en IA, où les chercheurs et les ingénieurs sont échangés comme des athlètes vedettes."
+    },
+    "url": "https://indianexpress.com/article/technology/artificial-intelligence/microsoft-hires-google-deepmind-employees-ai-talent-war-report-10145211/",
+    "categories": [
+      "Company"
+    ]
+  },
+  {
+    "timestamp": "2025-07-23T15:03:00Z",
+    "title": {
+      "en": "OpenAI says it has proof its tools are making workers more productive",
+      "fr": "OpenAI affirme avoir la preuve que ses outils rendent les travailleurs plus productifs"
+    },
+    "summary": {
+      "en": "OpenAI study unsurprisingly finds AI is making workers more productive",
+      "fr": "Une étude d'OpenAI révèle sans surprise que l'IA rend les travailleurs plus productifs"
+    },
+    "url": "https://www.techradar.com/pro/openai-says-it-has-proof-its-tools-are-making-workers-more-productive",
+    "categories": [
+      "Company"
+    ]
+  },
+  {
+    "timestamp": "2025-07-23T14:58:02Z",
+    "title": {
+      "en": "Lovable Hits $100M ARR in 8 Months, Eyes $1B with New Autonomous Agent Update",
+      "fr": "Lovable atteint 100 millions de dollars de chiffre d'affaires annuel en 8 mois et vise 1 milliard de dollars grâce à la nouvelle mise à jour de l'agent autonome"
+    },
+    "summary": {
+      "en": "Anton Osika, founder of the vibe coding platform Lovable, announced that the company has reached $100 million in annual recurring revenue (ARR) within eight months of launch — a pace faster than companies like OpenAI, Cursor, and Wiz, according to Osika.",
+      "fr": "Anton Osika, fondateur de la plateforme de codage d'ambiance Lovable, a annoncé que la société avait atteint 100 millions de dollars de revenus récurrents annuels (ARR) dans les huit mois suivant son lancement, un rythme plus rapide que celui d'entreprises comme OpenAI, Cursor et Wiz, selon Osika."
+    },
+    "url": "https://analyticsindiamag.com/ai-news-updates/lovable-hits-100m-arr-in-8-months-eyes-1b-with-new-autonomous-agent-update/",
+    "categories": [
+      "Company"
+    ]
+  },
+  {
+    "timestamp": "2025-07-23T14:27:56Z",
+    "title": {
+      "en": "A new study just upended AI safety",
+      "fr": "Une nouvelle étude vient de bouleverser la sécurité de l'IA"
+    },
+    "summary": {
+      "en": "Evil AI is contagious, researchers found, as part of a joint research project between Truthful AI and the Anthropic Fellows program. The new study could upend AI safety.",
+      "fr": "L'IA malveillante est contagieuse, ont découvert des chercheurs dans le cadre d'un projet de recherche conjoint entre Truthful AI et le programme Anthropic Fellows. Cette nouvelle étude pourrait remettre en cause la sécurité de l'IA."
+    },
+    "url": "https://www.theverge.com/ai-artificial-intelligence/711975/a-new-study-just-upended-ai-safety",
+    "categories": [
+      "Company"
+    ]
+  },
+  {
+    "timestamp": "2025-07-23T12:44:00Z",
+    "title": {
+      "en": "ChatGPT now handles 2.5 billion prompts daily, OpenAI confirms",
+      "fr": "ChatGPT gère désormais 2,5 milliards de messages par jour, confirme OpenAI"
+    },
+    "summary": {
+      "en": "OpenAI recently told Axios that its popular generative AI chatbot, ChatGPT, receives over 2.5 billion prompts per day globally. Of those, over 330 million, or around 13...",
+      "fr": "OpenAI a récemment indiqué à Axios que son célèbre chatbot génératif à IA, ChatGPT, reçoit plus de 2,5 milliards de messages par jour dans le monde. Parmi eux, plus de 330 millions, soit environ 13…"
+    },
+    "url": "https://www.techspot.com/news/108770-chatgpt-now-handles-25-billion-prompts-daily-openai.html",
+    "categories": [
+      "Company"
+    ]
+  },
+  {
+    "timestamp": "2025-07-23T11:23:00Z",
+    "title": {
+      "en": "Stargate is back on - OpenAI and Oracle unveil massive data center expansion plans in major AI push",
+      "fr": "Stargate est de retour - OpenAI et Oracle dévoilent des plans d'expansion massifs de centres de données dans le cadre d'une avancée majeure en matière d'IA"
+    },
+    "summary": {
+      "en": "Project Stargate is back underway with $30bn deal",
+      "fr": "Le projet Stargate est de nouveau en cours avec un contrat de 30 milliards de dollars"
+    },
+    "url": "https://www.techradar.com/pro/stargate-is-back-on-openai-and-oracle-unveil-massive-data-center-expansion-plans-in-major-ai-push",
+    "categories": [
+      "Company"
+    ]
+  },
+  {
+    "timestamp": "2025-07-23T10:00:00Z",
+    "title": {
+      "en": "OpenAI CEO Sam Altman says bank voice ID is no match for AI",
+      "fr": "Sam Altman, PDG d'OpenAI, affirme que l'identification vocale des banques n'est pas à la hauteur de l'IA"
+    },
+    "summary": {
+      "en": "OpenAI CEO Sam Altman revealed that he is alarmed by the continued use of voice authentication by banking institutions as AI becomes increasingly prevalent.",
+      "fr": "Le PDG d'OpenAI, Sam Altman, a révélé qu'il était alarmé par l'utilisation continue de l'authentification vocale par les institutions bancaires alors que l'IA devient de plus en plus répandue."
+    },
+    "url": "https://www.windowscentral.com/artificial-intelligence/openai-chatgpt/sam-altman-is-terrified-of-voice-id-fraudsters-embracing-ai",
+    "categories": [
+      "Company"
+    ]
+  },
+  {
+    "timestamp": "2025-07-24T16:28:15Z",
+    "title": {
+      "en": "Ike Barinholtz cast as Elon Musk in OpenAI film from Luca Guadagnino",
+      "fr": "Ike Barinholtz incarne Elon Musk dans le film OpenAI de Luca Guadagnino"
+    },
+    "summary": {
+      "en": "Emmy-nominated actor to play co-founder of OpenAI in Artificial, said to be set during Sam Altman’s firing and rehiring as CEO",
+      "fr": "L'acteur nominé aux Emmy Awards incarnera le cofondateur d'OpenAI dans Artificial, qui se déroulerait pendant le licenciement et la réembauche de Sam Altman en tant que PDG."
+    },
+    "url": "https://www.theguardian.com/film/2025/jul/24/elon-musk-ike-barinholtz-openai-film-artificial-luca-guadagnino",
+    "categories": [
+      "Company"
+    ]
+  },
+  {
+    "timestamp": "2025-07-24T16:00:00Z",
+    "title": {
+      "en": "OpenAI prepares to launch GPT-5 in August",
+      "fr": "OpenAI se prépare à lancer GPT-5 en août"
+    },
+    "summary": {
+      "en": "OpenAI is getting ready to launch its next-gen AI model. GPT-5 is tentatively scheduled to arrive in early August.",
+      "fr": "OpenAI se prépare à lancer son modèle d'IA de nouvelle génération. La sortie de GPT-5 est provisoirement prévue pour début août."
+    },
+    "url": "https://www.theverge.com/notepad-microsoft-newsletter/712950/openai-gpt-5-model-release-date-notepad",
+    "categories": [
+      "Company"
+    ]
+  },
+  {
+    "timestamp": "2025-07-24T13:32:42Z",
+    "title": {
+      "en": "Sam Altman says there’s ‘Something about collectively deciding we're going to live our lives the way AI tells us feels bad and dangerous’ as OpenAI CEO worries about an AI-dominated future",
+      "fr": "Sam Altman affirme qu'il y a « quelque chose de mal et de dangereux dans le fait de décider collectivement que nous allons vivre nos vies comme l'IA nous le dit », alors que le PDG d'OpenAI s'inquiète d'un avenir dominé par l'IA."
+    },
+    "summary": {
+      "en": "Over-reliant",
+      "fr": "Trop dépendant"
+    },
+    "url": "https://www.techradar.com/ai-platforms-assistants/chatgpt/sam-altman-says-theres-something-about-collectively-deciding-were-going-to-live-our-lives-the-way-ai-tells-us-feels-bad-and-dangerous-as-openai-ceo-worries-about-an-ai-dominated-future",
+    "categories": [
+      "Company"
+    ]
+  },
+  {
+    "timestamp": "2025-07-24T12:23:34Z",
+    "title": {
+      "en": "Google Powers India’s AI Mission with Sarvam AI, Soket AI, Gnani.ai",
+      "fr": "Google alimente la mission d'IA de l'Inde avec Sarvam AI, Soket AI et Gnani.ai"
+    },
+    "summary": {
+      "en": "Google has firmly placed its bet on India. It is stepping in to help the Indian startups develop their own foundational models. At Google I/O India 2025, Manish Gupta, senior director at Google Deepmind, announced that three startups, Sarvam, Soket AI, and Gnani.ai, are building local solutions on top of Gemma family of models.",
+      "fr": "Google a fermement misé sur l'Inde. L'entreprise intervient pour aider les startups indiennes à développer leurs propres modèles fondamentaux. Lors de Google I/O India 2025, Manish Gupta, directeur principal de Google Deepmind, a annoncé que trois startups, Sarvam, Soket AI et Gnani.ai, construisent des solutions locales sur la base de la famille de modèles Gemma."
+    },
+    "url": "https://analyticsindiamag.com/global-tech/google-powers-indias-ai-mission-with-sarvam-ai-soket-ai-gnani-ai/",
+    "categories": [
+      "Company"
+    ]
+  },
+  {
+    "timestamp": "2025-07-24T10:15:00Z",
+    "title": {
+      "en": "OpenAI CEO Sam Altman warns AI will wipe entire job categories off the map",
+      "fr": "Sam Altman, PDG d'OpenAI, prévient que l'IA va effacer des catégories d'emplois entières de la carte"
+    },
+    "summary": {
+      "en": "Sam Altman, OpenAI’s CEO, warned of his vision of an AI-dominated future where entire categories of jobs would be taken over, presidents follow the suggestions of ChatGPT, and AI is used for war and injustice.",
+      "fr": "Sam Altman, PDG d’OpenAI, a mis en garde contre sa vision d’un avenir dominé par l’IA où des catégories entières d’emplois seraient reprises, les présidents suivraient les suggestions de ChatGPT et l’IA serait utilisée pour la guerre et l’injustice."
+    },
+    "url": "https://www.tomsguide.com/ai/openai-ceo-sam-altman-warns-ai-will-wipe-entire-job-categories-off-the-map",
+    "categories": [
+      "Company"
+    ]
+  },
+  {
+    "timestamp": "2025-07-24T09:43:26Z",
+    "title": {
+      "en": "OpenAI CEO warns Gen Z is too emotionally reliant on ChatGPT",
+      "fr": "Le PDG d'OpenAI prévient que la génération Z est trop dépendante émotionnellement de ChatGPT"
+    },
+    "summary": {
+      "en": "In multiple interviews, OpenAI CEO Sam Altman talked about the threat generative AI poses to professions, but doesn't think it can take over the health sector due to its hallucination tendencies.",
+      "fr": "Dans plusieurs interviews, le PDG d'OpenAI, Sam Altman, a parlé de la menace que représente l'IA générative pour les professions, mais ne pense pas qu'elle puisse prendre le contrôle du secteur de la santé en raison de ses tendances hallucinatoires."
+    },
+    "url": "https://www.windowscentral.com/artificial-intelligence/openai-chatgpt/sam-altman-wont-trust-chatgpt-with-his-medical-fate-unless-a-doctor-is-involved",
+    "categories": [
+      "Company"
+    ]
+  },
+  {
+    "timestamp": "2025-07-24T06:38:04Z",
+    "title": {
+      "en": "“Crazy Thing”: OpenAI CEO Sam Altman Warns of Looming AI Fraud Crisis",
+      "fr": "« Crazy Thing » : Sam Altman, PDG d'OpenAI, met en garde contre une crise imminente de fraude à l'IA"
+    },
+    "summary": {
+      "en": "Altman raises alarm",
+      "fr": "Altman tire la sonnette d'alarme"
+    },
+    "url": "https://in.mashable.com/tech/97534/crazy-thing-openai-ceo-sam-altman-warns-of-looming-ai-fraud-crisis",
+    "categories": [
+      "Company"
+    ]
+  },
+  {
+    "timestamp": "2025-07-24T04:00:00Z",
+    "title": {
+      "en": "Fortune Tech: Elon Musk's Tesla robotaxi plan, David Sacks AI party, Google's capex",
+      "fr": "Fortune Tech : le projet de robotaxi Tesla d'Elon Musk, la fête de l'IA de David Sacks, les dépenses d'investissement de Google"
+    },
+    "summary": {
+      "en": "Plus: OpenAI's search, Meta's wristband, Nintendo's win, and AI agent insurance.",
+      "fr": "De plus : la recherche d'OpenAI, le bracelet de Meta, la victoire de Nintendo et l'assurance de l'agent IA."
+    },
+    "url": "https://fortune.com/2025/07/24/elon-musk-has-a-promise-for-tesla-owners-to-rent-robotaxis-and-a-wish-for-more-control-of-the-ev-company/",
+    "categories": [
+      "Company",
+      "Agent AI"
+    ]
+  },
+  {
+    "timestamp": "2025-07-23T22:23:21Z",
+    "title": {
+      "en": "Sundar Pichai is 'very excited' about Google Cloud's OpenAI partnership",
+      "fr": "Sundar Pichai est « très enthousiaste » à propos du partenariat OpenAI avec Google Cloud"
+    },
+    "summary": {
+      "en": "The comment came shortly after analysts peppered Pichai and other Google executives with questions about how AI would affect its core search business and why Google is spending an extra $10 billion on capital expenditures this year to catch up in the AI race.",
+      "fr": "Ce commentaire est intervenu peu de temps après que des analystes ont assailli Pichai et d'autres dirigeants de Google de questions sur la manière dont l'IA affecterait son activité principale de recherche et sur les raisons pour lesquelles Google dépense 10 milliards de dollars supplémentaires en dépenses d'investissement cette année pour rattraper son retard dans la course à l'IA."
+    },
+    "url": "https://techcrunch.com/2025/07/23/sundar-pichai-is-very-excited-about-google-clouds-openai-partnership/",
+    "categories": [
+      "Company"
+    ]
+  },
+  {
+    "timestamp": "2025-07-23T21:34:26Z",
+    "title": {
+      "en": "OpenAI and partners are building a massive AI data center in Texas",
+      "fr": "OpenAI et ses partenaires construisent un immense centre de données d'IA au Texas"
+    },
+    "summary": {
+      "en": "“Easy to throw around numbers, but this is a gigantic infrastructure project.”…",
+      "fr": "« Il est facile de lancer des chiffres, mais il s’agit d’un projet d’infrastructure gigantesque. »…"
+    },
+    "url": "https://arstechnica.com/ai/2025/07/openai-and-partners-are-building-a-massive-ai-data-center-in-texas/",
+    "categories": [
+      "Company"
+    ]
+  }
+]
