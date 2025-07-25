@@ -5,6 +5,7 @@ __pycache__/
 # Virtual environment (if used locally)
 venv/
 .env/
+.env
 
 # OS junk
 .DS_Store
