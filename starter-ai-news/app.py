@@ -3,12 +3,15 @@ import json
 import os
 import requests
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
 
 app = Flask(__name__)
 
 # --- API KEYS & ENDPOINTS ---
+load_dotenv()
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GNEWS_API_KEY = "aeed94f6489b0667554329a561e387a8"  # Replace with your actual GNews key
-GOOGLE_TRANSLATE_API_KEY = "AIzaSyCCG0_D1Pi8RQ7NcW9FV4-v3S8N85Kg4Jg"  # Replace with your actual Google API key
+#GOOGLE_TRANSLATE_API_KEY = "AIzaSyCCG0_D1Pi8RQ7NcW9FV4-v3S8N85Kg4Jg"  # Replace with your actual Google API key
 GNEWS_ENDPOINT = "https://gnews.io/api/v4/search"
 
 CACHE_PATH = "data/news_cache.json"
@@ -23,7 +26,7 @@ def translate_to_french(text: str) -> str:
         "q": text,
         "target": "fr",
         "format": "text",
-        "key": GOOGLE_TRANSLATE_API_KEY
+        "key": GOOGLE_API_KEY
     }
 
     try:
