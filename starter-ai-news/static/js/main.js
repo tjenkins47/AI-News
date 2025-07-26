@@ -11,7 +11,6 @@ document.addEventListener("DOMContentLoaded", () => {
     storedLang = storedLang.toUpperCase();
   }
 
-  //console.log("🗣 Using language:", storedLang);
   setSelectedLangLabel(storedLang);
   loadNews(storedLang);
 
@@ -19,13 +18,13 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".lang-select").forEach(el => {
     el.addEventListener("click", (e) => {
       e.preventDefault();
-      const raw = e.target.getAttribute("data-lang");
-      if (!raw) {
+      const langElement = e.target.closest("[data-lang]");
+      if (!langElement) {
         console.warn("Missing data-lang attribute on clicked item:", e.target);
         return;
       }
 
-      const selectedLang = raw.toUpperCase();
+      const selectedLang = langElement.getAttribute("data-lang").toUpperCase();
       if (!allowedLangs.includes(selectedLang)) {
         console.warn("Invalid language selected:", selectedLang);
         return;
