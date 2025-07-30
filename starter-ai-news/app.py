@@ -66,13 +66,7 @@ def save_cache(cache):
         json.dump(cache, f, ensure_ascii=False, indent=2)
 
 def should_fetch_fresh_news(interval_minutes=60):
-    try:
-        with open(LAST_FETCH_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            last_time = datetime.fromisoformat(data["timestamp"])
-            return datetime.now() - last_time > timedelta(minutes=interval_minutes)
-    except:
-        return True
+    return True
 
 def update_last_fetch_time():
     with open(LAST_FETCH_PATH, "w", encoding="utf-8") as f:
