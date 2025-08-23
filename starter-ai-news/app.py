@@ -83,7 +83,7 @@ def fetch_ai_news():
     params = {
         "q": query,
         "lang": "en",
-        "max": 10,
+        "max": 5,
         "apikey": GNEWS_API_KEY
     }
 
