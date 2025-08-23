@@ -4,14 +4,12 @@ __pycache__/
 
 # Virtual environment (if used locally)
 venv/
-.env/
+
+# Secrets
 .env
 
 # OS junk
 .DS_Store
 
-# Sets language variables to EN and FR
+# Optional dev scripts
 LanguageCleaner.py
-
-# DO NOT ignore cache – we want this file in Railway
-# data/news_cache.json should NOT be listed here
