@@ -1,228 +1,509 @@
+# app.py — AI News v2 (AI + Finance)
+# Fixes: timezone sort error, faster fetch (fewer queries), optional translation, robust cache.
+
 import os
 import json
+import re
+import difflib
+import urllib.parse
+import datetime as dt
+from datetime import datetime, timezone
+from typing import List, Dict, Any, Iterable
+
+import logging
 import requests
-from datetime import datetime, timedelta
 from flask import Flask, render_template, jsonify
 from dotenv import load_dotenv
-from fuzzywuzzy import fuzz
 
+# --------------------------------------------------------------------------------------
+# App / env
+# --------------------------------------------------------------------------------------
 app = Flask(__name__)
 load_dotenv()
 
-# --- API Keys ---
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-GNEWS_API_KEY = os.getenv("GNEWS_API_KEY")
-NEWSDATA_API_KEY = os.getenv("NEWSDATA_API_KEY")
+# --- Logging ---
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+log = logging.getLogger("ai-news")
 
-# --- File Paths ---
-CACHE_PATH = "data/news_cache.json"
-LAST_FETCH_PATH = "data/last_fetch.json"
+# --- API Keys / Flags ---
+GNEWS_API_KEY = os.getenv("GNEWS_API_KEY", "").strip()
+NEWSDATA_API_KEY = os.getenv("NEWSDATA_API_KEY", "").strip()
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "").strip()
+TRANSLATE_ENABLED = os.getenv("TRANSLATE_ENABLED", "0").strip() in ("1", "true", "True", "yes", "on")
 
-# --- Translation ---
+CACHE_VERSION = "v2-badges-2"  # bump this whenever schema/tags change
+DATA_DIR = "data"
+NEWS_CACHE_PATH = os.path.join(DATA_DIR, f"news_cache_{CACHE_VERSION}.json")
+
+# optional: lightweight admin flush to clear cache on Railway
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")  # set this in Railway variables
+
+@app.route("/admin/flush-cache/<token>")
+def flush_cache(token):
+    if not ADMIN_TOKEN or token != ADMIN_TOKEN:
+        return {"ok": False, "error": "unauthorized"}, 401
+    try:
+        if os.path.exists(NEWS_CACHE_PATH):
+            os.remove(NEWS_CACHE_PATH)
+        return {"ok": True, "message": "cache cleared"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}, 500
+
+def _mask(s: str) -> str:
+    if not s: return "(missing)"
+    return s[:3] + "…" + s[-3:] if len(s) > 6 else "***"
+
+log.info("GNEWS_API_KEY: %s | NEWSDATA_API_KEY: %s | GOOGLE_API_KEY: %s | TRANSLATE_ENABLED=%s",
+         _mask(GNEWS_API_KEY), _mask(NEWSDATA_API_KEY), _mask(GOOGLE_API_KEY), TRANSLATE_ENABLED)
+
+# --- Settings ---
+MAX_TOTAL_STORIES = 12
+CACHE_TTL_MINUTES = 45
+DATA_DIR = "data"
+NEWS_CACHE_PATH = os.path.join(DATA_DIR, "news_cache.json")
+
+# --------------------------------------------------------------------------------------
+# Query shards (kept under provider limits)
+# --------------------------------------------------------------------------------------
+GNEWS_QUERIES = [
+    '"OpenAI" OR Anthropic OR "Google DeepMind"',
+    'AI OR "artificial intelligence" OR LLM',
+    'Nvidia OR "AI chips" OR semiconductor',
+    'Microsoft OR Alphabet OR Google',
+    'Meta OR Amazon OR AMD',
+    'Mistral OR "Agent AI"',
+]
+NEWSDATA_TECH_QUERIES = [
+    'AI OR "artificial intelligence"',
+    '"large language model" OR LLM',
+    'OpenAI OR Anthropic OR Mistral',
+    '"Google DeepMind" OR "Agent AI"',
+]
+NEWSDATA_BIZ_QUERIES = [
+    'AI earnings',
+    'AI chips OR Nvidia',
+    'Microsoft AND AI',
+    'Google OR Alphabet AND AI',
+    'Meta AND AI',
+    'Amazon AND AI',
+    'AMD AND AI',
+]
+
+# --------------------------------------------------------------------------------------
+# Utilities
+# --------------------------------------------------------------------------------------
+_WORD_RE = re.compile(r"[A-Za-z0-9]+")
+
+def _norm_title_key(title: str) -> str:
+    toks = _WORD_RE.findall((title or "").lower())
+    return " ".join(toks)
+
+def _url_key(url: str) -> str:
+    try:
+        u = urllib.parse.urlparse(url or "")
+        return f"{(u.netloc or '').lower()}{(u.path or '').lower()}"
+    except Exception:
+        return (url or "").lower().strip()
+
+def _fuzzy_dup(a: str, b: str, ratio_threshold: float) -> bool:
+    return difflib.SequenceMatcher(None, (a or "").lower(), (b or "").lower()).ratio() >= ratio_threshold
+
+def _parse_iso_to_naive_utc(ts: str) -> dt.datetime:
+    """
+    Parse mixed timestamp formats and return **naive UTC** (tzinfo=None) to avoid aware/naive comparison errors.
+    """
+    if not ts:
+        return dt.datetime.utcnow()
+    t = ts.strip().replace("UTC", "+0000")
+    try:
+        # handle "YYYY-mm-dd HH:MM:SS %z" or without tz
+        if " " in t and "T" not in t:
+            try:
+                aware = dt.datetime.strptime(t, "%Y-%m-%d %H:%M:%S %z")
+                return aware.astimezone(timezone.utc).replace(tzinfo=None)
+            except Exception:
+                try:
+                    naive = dt.datetime.strptime(t, "%Y-%m-%d %H:%M:%S")
+                    return naive  # treat as naive UTC
+                except Exception:
+                    pass
+            t = t.replace(" ", "T").replace("+0000", "+00:00")
+        dtobj = dt.datetime.fromisoformat(t)  # may be aware or naive
+        if dtobj.tzinfo is not None:
+            return dtobj.astimezone(timezone.utc).replace(tzinfo=None)
+        return dtobj  # naive -> assume UTC
+    except Exception:
+        return dt.datetime.utcnow()
+
+def _title_text(s: Dict[str, Any]) -> str:
+    t = s.get("title")
+    if isinstance(t, dict):
+        return (t.get("en") or t.get("fr") or "").strip()
+    return (t or "").strip()
+
+# --- De-dupe (keeps old name/signature) ---
+def deduplicate_by_token_set(articles, threshold: int = 90, max_per_topic: int = 2):
+    """
+    Improved de-dupe:
+      - Checks normalized title + URL
+      - Adds fuzzy check on (title+summary)
+      - Limits stories per 'topic cluster' (max_per_topic)
+    """
+    ratio_threshold = max(0.0, min(1.0, threshold / 100.0))
+    seen_title_keys, seen_url_keys = set(), set()
+    kept = []
+    topic_counts = {}
+
+    def topic_key(story: Dict[str, Any]) -> str:
+        """Simple heuristic: collapse on important keywords in title+summary."""
+        text = (_title_text(story) + " " + (story.get("summary", {}).get("en") or "")).lower()
+        if "lawsuit" in text or "sue" in text:
+            return "lawsuit"
+        if "earnings" in text or "revenue" in text or "investment" in text:
+            return "finance"
+        if "nvidia" in text or "chip" in text or "semiconductor" in text:
+            return "nvidia"
+        if "microsoft" in text:
+            return "microsoft"
+        if "google" in text or "alphabet" in text or "deepmind" in text:
+            return "google"
+        if "meta" in text:
+            return "meta"
+        if "amazon" in text:
+            return "amazon"
+        return "other"
+
+    for s in articles or []:
+        title = _title_text(s)
+        url = (s.get("url") or "").strip()
+        summary = (s.get("summary", {}).get("en") or "").strip()
+        tkey = _norm_title_key(title)
+        ukey = _url_key(url)
+
+        if tkey in seen_title_keys or (ukey and ukey in seen_url_keys):
+            continue
+        if any(_fuzzy_dup(title + " " + summary, _title_text(k) + " " + (k.get("summary", {}).get("en") or ""), ratio_threshold) for k in kept):
+            continue
+
+        # Topic limit
+        tcluster = topic_key(s)
+        if topic_counts.get(tcluster, 0) >= max_per_topic:
+            continue
+        topic_counts[tcluster] = topic_counts.get(tcluster, 0) + 1
+
+        seen_title_keys.add(tkey)
+        if ukey: seen_url_keys.add(ukey)
+        kept.append(s)
+
+    return kept
+
+
+def merge_sort_cap(all_stories: Iterable[Dict[str, Any]], cap: int = MAX_TOTAL_STORIES) -> List[Dict[str, Any]]:
+    def ts(s):
+        val = s.get("timestamp") or s.get("published_at") or ""
+        try:
+            return _parse_iso_to_naive_utc(val)
+        except Exception:
+            return dt.datetime.min
+    merged = list(all_stories)
+    merged.sort(key=ts, reverse=True)
+    return merged[:cap]
+
+# --------------------------------------------------------------------------------------
+# Helpers (translate, classify, cache)
+# --------------------------------------------------------------------------------------
 def translate_to_french(text: str) -> str:
+    text = text or ""
     if not text:
         return ""
+    if not TRANSLATE_ENABLED or not GOOGLE_API_KEY:
+        return text  # fast path: disabled → echo EN
     url = "https://translation.googleapis.com/language/translate/v2"
-    params = {
-        "q": text,
-        "target": "fr",
-        "format": "text",
-        "key": GOOGLE_API_KEY
-    }
-    headers = {
-        "Content-Type": "application/x-www-form-urlencoded"
-    }
+    params = {"q": text, "target": "fr", "format": "text", "key": GOOGLE_API_KEY}
     try:
-        response = requests.post(url, data=params, headers=headers)
-        if response.status_code == 200:
-            return response.json()["data"]["translations"][0]["translatedText"]
+        resp = requests.post(url, data=params, timeout=8)
+        if resp.status_code == 200:
+            return resp.json()["data"]["translations"][0]["translatedText"]
         else:
-            print(f"Translation error {response.status_code}: {response.text}")
-            return text
-    except requests.exceptions.RequestException as e:
-        print(f"Translation exception: {e}")
-        return text
-
-# --- Classification ---
-def classify_article(title: str, summary: str) -> list:
-    text = f"{title} {summary}".lower()
-    categories = []
-    if any(k in text for k in ["gpt-5", "gpt-4o", "claude", "mistral", "llm", "transformer"]):
-        categories.append("Model")
-    if any(k in text for k in ["openai", "anthropic", "google deepmind", "meta", "microsoft", "amazon", "apple"]):
-        categories.append("Company")
-    if any(k in text for k in ["agent ai", "ai agent", "agentic ai"]):
-        categories.append("Agent AI")
-    return categories or ["General"]
-
-# --- Cache Handling ---
-def load_cache():
-    if os.path.exists(CACHE_PATH):
-        with open(CACHE_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
-
-def save_cache(cache):
-    with open(CACHE_PATH, "w", encoding="utf-8") as f:
-        json.dump(cache, f, ensure_ascii=False, indent=2)
-
-def update_last_fetch_time():
-    with open(LAST_FETCH_PATH, "w", encoding="utf-8") as f:
-        json.dump({ "timestamp": datetime.now().isoformat() }, f)
-
-def should_fetch_fresh_news(interval_minutes=60):
-    return True
-
-# --- Deduplication (best-performing) ---
-def deduplicate_by_token_set(articles, threshold=90):
-    unique = []
-    seen_texts = []
-
-    for article in articles:
-        title = article.get("title", "").strip()
-        summary = article.get("description", "").strip()
-        combined = f"{title} {summary}".lower()
-
-        if not combined:
-            continue
-
-        if any(fuzz.token_set_ratio(combined, seen) >= threshold for seen in seen_texts):
-            continue
-
-        seen_texts.append(combined)
-        unique.append(article)
-
-    return unique
-
-# --- GNews: Split queries ---
-def fetch_gnews_articles():
-    topics = ["OpenAI", "GPT-4o", "gpt-5", "Claude", "Anthropic", "Agent AI"]
-    all_articles = []
-
-    for topic in topics:
-        params = {
-            "q": f'"{topic}"',
-            "lang": "en",
-            "max": 3,  # limit per topic (GNews free tier = 10 max)
-            "apikey": GNEWS_API_KEY
-        }
-        try:
-            response = requests.get("https://gnews.io/api/v4/search", params=params)
-            print(f"Querying GNews: {response.url}")
-            if response.status_code == 200:
-                all_articles.extend(response.json().get("articles", []))
-            else:
-                print(f"GNews error for {topic}: {response.status_code}")
-        except Exception as e:
-            print(f"GNews exception for {topic}: {e}")
-
-    return all_articles
-
-# --- NewsData.io integration ---
-def fetch_newsdata_ai_news():
-
-#print(f"[DEBUG] NewsData API Key loaded: {NEWSDATA_API_KEY}")
-
-
-    query = "openai OR gpt-4o OR GPT-5 OR claude OR anthropic OR agent ai"
-    url = "https://newsdata.io/api/1/news"
-    params = {
-        "apikey": NEWSDATA_API_KEY,
-        "q": query,
-        "language": "en",
-        "category": "technology",
-        "country": "us",
-        "page": 0
-    }
-
-    try:
-        response = requests.get(url, params=params)
-        print(f"Querying NewsData.io: {response.url}")
-        if response.status_code != 200:
-            print(f"NewsData error: {response.status_code}")
-            return []
-
-        articles = response.json().get("results", [])
-        formatted = []
-        for a in articles:
-            formatted.append({
-                "timestamp": a.get("pubDate"),
-                "title": {
-                    "en": a.get("title", ""),
-                    "fr": translate_to_french(a.get("title", ""))
-                },
-                "summary": {
-                    "en": a.get("description", ""),
-                    "fr": translate_to_french(a.get("description", ""))
-                },
-                "url": a.get("link"),
-                "categories": classify_article(a.get("title", ""), a.get("description", ""))
-            })
-
-        return formatted
-
+            log.warning("Translate failed %s: %s", resp.status_code, resp.text[:140])
     except Exception as e:
-        print(f"NewsData fetch exception: {e}")
+        log.warning("Translate exception: %s", e)
+    return text
+
+def classify_article(title_en: str, summary_en: str) -> List[str]:
+    """
+    Return a small set of human-friendly categories for badges.
+    We purposely keep 'finance' lowercase so your Finance badge logic still works.
+    """
+    text = f"{title_en} {summary_en}".lower()
+
+    cats = set()
+
+    # --- High-signal themes ---
+    # Finance / markets / funding
+    if any(k in text for k in [
+        "earnings", "revenue", "profit", "quarter", "guidance", "valuation",
+        "ipo", "stock", "shares", "market cap", "dividend", "buyback",
+        "funding", "raised", "seed", "series a", "series b", "venture",
+        "acquisition", "merger", "m&a", "spinoff"
+    ]):
+        cats.add("finance")
+
+    # Legal / lawsuit
+    if any(k in text for k in ["lawsuit", "sues", "sued", "settlement", "complaint", "class action"]):
+        cats.add("Law")
+
+    # Policy / regulation
+    if any(k in text for k in [
+        "regulation", "regulatory", "eu ai act", "sec", "ftc", "doj",
+        "bill", "senate", "house committee", "white house", "executive order",
+        "ofcom", "ico (uk)"
+    ]):
+        cats.add("Policy")
+
+    # Safety / governance / alignment
+    if any(k in text for k in ["safety", "red team", "alignment", "guardrail", "mitigation", "harm reduction"]):
+        cats.add("Safety")
+
+    # Security / privacy
+    if any(k in text for k in ["breach", "leak", "ransomware", "compromise", "exploit", "zero-day", "privacy"]):
+        cats.add("Security")
+
+    # Hardware / chips / data centers
+    if any(k in text for k in ["nvidia", "gpu", "h100", "h200", "blackwell", "chip", "semiconductor", "data center", "accelerator"]):
+        cats.add("Hardware")
+
+    # Research / benchmarks
+    if any(k in text for k in ["benchmark", "paper", "arxiv", "sota", "state-of-the-art", "researchers", "dataset"]):
+        cats.add("Research")
+
+    # Open source
+    if any(k in text for k in ["open source", "apache-2.0", "mit license", "oss"]):
+        cats.add("Open Source")
+
+    # Product / release features
+    if any(k in text for k in ["launch", "rollout", "release", "update", "feature", "preview", "private beta", "general availability"]):
+        cats.add("Product")
+
+    # Company names (light touch; we don't show a "Company" badge anymore)
+    # (Category added only if no other category found, to avoid clutter)
+    company_hit = any(k in text for k in [
+        "openai", "anthropic", "mistral", "deepmind", "google", "alphabet",
+        "microsoft", "meta", "amazon", "amd", "xai", "databricks", "snowflake"
+    ])
+
+    # Model detection (this is the badge you asked to keep)
+    if any(k in text for k in [
+        "gpt", "chatgpt", "gpt-4", "gpt-4", "gpt-4o", "gpt-4.1", "gpt-5",
+        "claude", "llama", "gemma", "gemini", "grok", "mistral", "mixtral",
+        "sonnet", "haiku", "opus", "sora"
+    ]) or "model" in text:
+        cats.add("Model")
+
+    # If nothing obvious, fall back based on weak hints
+    if not cats:
+        if company_hit:
+            # no "Company" badge requested anymore; just give a topical hint
+            cats.add("Product")
+        else:
+            cats.add("AI")
+
+    # Keep it small and stable in order
+    order = ["Model", "Hardware", "Research", "Open Source", "Product", "Safety", "Security", "Policy", "Law", "finance", "AI"]
+    final = [c for c in order if c in cats]
+
+    return final or ["AI"]
+
+
+def load_cache() -> List[Dict[str, Any]]:
+    try:
+        if not os.path.exists(NEWS_CACHE_PATH):
+            return []
+        with open(NEWS_CACHE_PATH, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        if isinstance(raw, list):
+            log.info("Loaded legacy cache list: %d items", len(raw))
+            return raw
+        if isinstance(raw, dict) and isinstance(raw.get("news"), list):
+            items = raw["news"]
+            log.info("Loaded cache dict: %d items", len(items))
+            return items
+        log.warning("Cache structure unexpected; ignoring.")
+        return []
+    except Exception as e:
+        log.warning("Cache load error: %s", e)
         return []
 
-# --- Unified Fetch ---
-def fetch_ai_news():
-    if not should_fetch_fresh_news():
-        print("⏱ Using cached news (not time to fetch yet)")
-        return load_cache()
+def save_cache(items: List[Dict[str, Any]]) -> None:
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        payload = {"cached_at": datetime.utcnow().isoformat(), "news": items}
+        with open(NEWS_CACHE_PATH, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+        log.info("Cache saved: %d items", len(items))
+    except Exception as e:
+        log.warning("Cache save error: %s", e)
 
-    print("🌐 Fetching fresh news from GNews and NewsData.io...")
+# --------------------------------------------------------------------------------------
+# Fetchers — smaller targets for speed
+# --------------------------------------------------------------------------------------
+def _normalize_story(title_en: str, summary_en: str, url: str, image_url: str,
+                     source: str, pub: str, tags: List[str] | None) -> Dict[str, Any]:
+    cats = classify_article(title_en, summary_en)
+    # Start with provided tags or just ['ai']
+    out_tags = list(tags) if tags else ["ai"]
+    if "finance" in cats and "finance" not in (t.lower() for t in out_tags):
+        out_tags.append("finance")
 
-    articles = fetch_gnews_articles()
-    articles += fetch_newsdata_ai_news()
+    return {
+        "timestamp": _parse_iso_to_naive_utc(pub).isoformat(),
+        "title": {"en": title_en, "fr": translate_to_french(title_en)},
+        "summary": {"en": summary_en, "fr": translate_to_french(summary_en)},
+        "url": url,
+        "image_url": image_url or None,
+        "source": source,
+        "categories": cats,           # <- richer set, includes 'Model' when applicable
+        "tags": out_tags,             # <- ensures finance tag is present when warranted
+    }
 
-    print(f"🔍 Combined article pool size before deduping: {len(articles)}")
-    articles = deduplicate_by_token_set(articles, threshold=90)
-    print(f"✅ Deduplicated: {len(articles)} unique stories")
 
-    cache = load_cache()
-    updated = False
-    final_stories = []
+def fetch_gnews_articles_for_query(q: str, max_items: int = 8) -> List[Dict[str, Any]]:
+    if not GNEWS_API_KEY:
+        return []
+    base = "https://gnews.io/api/v4/search"
+    params = {"q": q, "lang": "en", "max": str(max_items), "token": GNEWS_API_KEY, "sortby": "publishedAt"}
+    r = requests.get(base, params=params, timeout=12)
+    if r.status_code != 200:
+        log.warning("GNews error %s for q='%s': %s", r.status_code, q, r.text[:140])
+        return []
+    return (r.json() or {}).get("articles", [])
 
-    for a in articles:
-        title_en = a.get("title", "")
-        summary_en = a.get("description", "")
-        url = a.get("url")
+def fetch_gnews_ai(total_target: int = 8) -> List[Dict[str, Any]]:
+    collected: List[Dict[str, Any]] = []
+    for q in GNEWS_QUERIES:
+        if len(collected) >= total_target: break
+        remaining = total_target - len(collected)
+        raw = fetch_gnews_articles_for_query(q, max_items=min(8, remaining))
+        for a in raw:
+            title_en = a.get("title", "") or ""
+            desc_en = a.get("description", "") or ""
+            published = a.get("publishedAt") or a.get("published_at") or ""
+            collected.append(_normalize_story(
+                title_en, desc_en, a.get("url"), a.get("image") or a.get("image_url"),
+                (a.get("source") or {}).get("name", "GNews"), published, ["ai"]
+            ))
+    log.info("GNews normalized stories (multi-query): %d", len(collected))
+    return collected
 
-        if not url:
-            continue
+def _newsdata_fetch_queries(category: str, queries: List[str], total_target: int, finance: bool) -> List[Dict[str, Any]]:
+    if not NEWSDATA_API_KEY:
+        return []
+    base = "https://newsdata.io/api/1/latest"
+    collected: List[Dict[str, Any]] = []
 
-        cached = next((item for item in cache if item["url"] == url), None)
+    for q in queries:
+        if len(collected) >= total_target: break
+        next_page = None
+        while len(collected) < total_target:
+            params = {"apikey": NEWSDATA_API_KEY, "category": category, "language": "en", "q": q}
+            if next_page: params["page"] = next_page
+
+            try:
+                resp = requests.get(base, params=params, timeout=12)
+            except Exception as e:
+                log.warning("NewsData %s exception: %s", category, e); break
+            if resp.status_code != 200:
+                log.warning("NewsData %s error %s for q='%s': %s", category, resp.status_code, q, resp.text[:140])
+                break
+
+            data = resp.json() or {}
+            results = data.get("results", [])
+            for r in results:
+                title_en = (r.get("title") or "").strip()
+                url = r.get("link") or r.get("url") or ""
+                if not title_en or not url: continue
+                src = (r.get("source_id") or r.get("source") or "NewsData").strip()
+                summary_en = (r.get("description") or r.get("content") or "").strip()
+                pub = r.get("pubDate") or r.get("published_at") or ""
+                collected.append(_normalize_story(
+                    title_en, summary_en, url, r.get("image_url") or r.get("image"),
+                    src, pub, (["finance","ai"] if finance else ["ai"])
+                ))
+                if len(collected) >= total_target: break
+
+            next_page = (data or {}).get("nextPage")
+            if not next_page or not results: break
+
+    log.info("NewsData %s normalized stories (multi-query): %d", category, len(collected))
+    return collected
+
+def fetch_newsdata_ai(total_target: int = 6) -> List[Dict[str, Any]]:
+    return _newsdata_fetch_queries("technology", NEWSDATA_TECH_QUERIES, total_target, finance=False)
+
+def fetch_newsdata_business_ai(total_target: int = 6) -> List[Dict[str, Any]]:
+    return _newsdata_fetch_queries("business", NEWSDATA_BIZ_QUERIES, total_target, finance=True)
+
+# --------------------------------------------------------------------------------------
+# Unified builder
+# --------------------------------------------------------------------------------------
+def fetch_ai_news() -> List[Dict[str, Any]]:
+    """
+    Fetch + merge (smaller, faster target sizes):
+      - GNews ~8
+      - NewsData tech ~6
+      - NewsData business ~6
+    Then de-dupe strictly and cap at 12 newest. Update cache on success.
+    """
+    try:
+        gnews = fetch_gnews_ai(8)
+        tech = fetch_newsdata_ai(6)
+        finance = fetch_newsdata_business_ai(6)
+
+        log.info("Pre-dedupe counts | GNews: %d | NewsData-tech: %d | NewsData-biz: %d",
+                 len(gnews), len(tech), len(finance))
+
+        combined = deduplicate_by_token_set([*gnews, *tech, *finance], threshold=92)
+        log.info("Post-dedupe count: %d", len(combined))
+
+        final = merge_sort_cap(combined, cap=MAX_TOTAL_STORIES)
+        log.info("Final (capped) count: %d", len(final))
+
+        if final:
+            save_cache(final)
+            return final
+
+        # Fallback: cache
+        cached = load_cache()
         if cached:
-            final_stories.append(cached)
-        else:
-            story = {
-                "timestamp": a.get("timestamp", ""),
-                "title": {"en": title_en, "fr": translate_to_french(title_en)},
-                "summary": {"en": summary_en, "fr": translate_to_french(summary_en)},
-                "url": url,
-                "categories": classify_article(title_en, summary_en)
-            }
-            final_stories.append(story)
-            cache.append(story)
-            updated = True
+            log.warning("Using cached items (live fetch empty): %d", len(cached))
+            return cached[:MAX_TOTAL_STORIES]
 
-    if updated:
-        save_cache(cache)
-        update_last_fetch_time()
+        log.error("No stories available from live fetch or cache.")
+        return []
 
-    return final_stories
+    except Exception as e:
+        log.error("fetch_ai_news unexpected error: %s", e)
+        cached = load_cache()
+        if cached:
+            log.warning("Error fallback to cache: %d", len(cached))
+            return cached[:MAX_TOTAL_STORIES]
+        return []
 
-# --- Routes ---
+# --------------------------------------------------------------------------------------
+# Routes
+# --------------------------------------------------------------------------------------
 @app.route("/")
 def home():
-    return render_template("index.html")
+    items = fetch_ai_news()
+    return render_template("index.html", news_items=items)
 
 @app.route("/api/news")
 def get_news():
-    stories = fetch_ai_news()
-    return jsonify(stories)
+    return jsonify(fetch_ai_news())
 
-# --- Main ---
+# --------------------------------------------------------------------------------------
+# Main
+# --------------------------------------------------------------------------------------
 if __name__ == "__main__":
+    os.makedirs(DATA_DIR, exist_ok=True)
     app.run(debug=True)
