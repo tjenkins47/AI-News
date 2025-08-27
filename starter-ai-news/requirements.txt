@@ -5,3 +5,6 @@ gunicorn
 python-dotenv
 fuzzywuzzy
 python-Levenshtein
+yfinance
+pandas
+numpy
