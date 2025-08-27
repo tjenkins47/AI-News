@@ -13,3 +13,5 @@ venv/
 
 # Optional dev scripts
 LanguageCleaner.py
+
+data/news_cache*.json
