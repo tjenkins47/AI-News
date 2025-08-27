@@ -54,8 +54,17 @@
               <a href="{{ item.url }}" class="btn btn-primary" target="_blank">Read more</a>
 
               <div class="mt-2">
+                {# Determine if we should show a distinct Finance badge #}
+                {% set has_finance = (item.tags is defined and item.tags and 'finance' in item.tags) or ('finance' in (item.categories or [])) %}
+                {% if has_finance %}
+                  <span class="badge bg-secondary me-1">Finance</span>
+                {% endif %}
+
+                {# Render remaining category badges, skipping a duplicate 'finance' if we already showed it above #}
                 {% for category in item.categories %}
-                  <span class="badge bg-secondary">{{ category }}</span>
+                  {% if not (has_finance and (category|lower == 'finance')) %}
+                    <span class="badge bg-secondary">{{ category }}</span>
+                  {% endif %}
                 {% endfor %}
               </div>
             </div>
