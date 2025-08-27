@@ -1,7 +1,7 @@
 # app.py — AI News v2 (AI + Finance)
 # Fixes: timezone sort error, faster fetch (fewer queries), optional translation, robust cache.
 
-import os
+import os, time
 import json
 import re
 import difflib
@@ -12,7 +12,7 @@ from typing import List, Dict, Any, Iterable
 
 import logging
 import requests
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 from dotenv import load_dotenv
 
 # --------------------------------------------------------------------------------------
@@ -37,6 +37,144 @@ NEWS_CACHE_PATH = os.path.join(DATA_DIR, f"news_cache_{CACHE_VERSION}.json")
 
 # optional: lightweight admin flush to clear cache on Railway
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")  # set this in Railway variables
+
+# -------- Simple per-key TTL cache (10 min) --------
+_CACHE = {}
+_CACHE_TTL_SEC = 10 * 60
+
+def _cache_get(key):
+    rec = _CACHE.get(key)
+    if not rec: return None
+    ts, data = rec
+    return data if (time.time() - ts) < _CACHE_TTL_SEC else None
+
+def _cache_put(key, data):
+    _CACHE[key] = (time.time(), data)
+    
+def fetch_yahoo_chart(symbol: str, range_: str, interval: str):
+    """
+    Returns {"symbol": "TSM", "points": [ {t,o,h,l,c,v}, ... ]}
+    """
+    import time, os, requests
+    from datetime import datetime, timezone
+
+    symbol = symbol.upper()
+    range_ = range_.lower()
+    interval = interval.lower()
+
+    # ---- per-key cache ----
+    ck = f"{symbol}|{range_}|{interval}"
+    cached = _cache_get(ck)
+    if cached:
+        return cached
+
+    def _trim_ytd(pts):
+        if range_ != "ytd" or not pts:
+            return pts
+        jan1 = datetime(datetime.now(timezone.utc).year, 1, 1, tzinfo=timezone.utc).timestamp() * 1000
+        return [p for p in pts if p["t"] >= jan1]
+
+    def _build_points_from_yahoo(payload):
+        result = payload.get("chart", {}).get("result", [{}])[0]
+        ts_list = result.get("timestamp") or []
+        ind = result.get("indicators", {}).get("quote", [{}])[0]
+        o = ind.get("open", []) or []
+        h = ind.get("high", []) or []
+        l = ind.get("low", []) or []
+        c = ind.get("close", []) or []
+        v = ind.get("volume", []) or []
+        pts = []
+        for i, ts in enumerate(ts_list):
+            # skip empty slots
+            if ts is None or i >= len(c) or c[i] in (None, "null"):
+                continue
+            pts.append({
+                "t": int(ts) * 1000,
+                "o": None if i >= len(o) else o[i],
+                "h": None if i >= len(h) else h[i],
+                "l": None if i >= len(l) else l[i],
+                "c": c[i],
+                "v": None if i >= len(v) else v[i],
+            })
+        return pts
+
+    def _try_rapidapi():
+        key = os.getenv("YF_RAPIDAPI_KEY", "").strip()
+        if not key:
+            return []
+        url = "https://apidojo-yahoo-finance-v1.p.rapidapi.com/stock/v3/get-chart"
+        wire_range = "1y" if range_ == "ytd" else range_
+        params = {"symbol": symbol, "interval": interval, "range": wire_range, "region": "US"}
+        headers = {
+            "X-RapidAPI-Key": key,
+            "X-RapidAPI-Host": "apidojo-yahoo-finance-v1.p.rapidapi.com",
+        }
+        r = requests.get(url, params=params, headers=headers, timeout=20)
+        r.raise_for_status()
+        pts = _build_points_from_yahoo(r.json())
+        return _trim_ytd(pts)
+
+    def _try_yfinance():
+        try:
+            import yfinance as yf
+            import pandas as pd
+        except Exception:
+            return []  # yfinance not installed locally
+        rng_map = {
+            "1d": ("1d", "5m"),
+            "5d": ("5d", "15m"),
+            "1mo": ("1mo", "1d"),
+            "6mo": ("6mo", "1d"),
+            "ytd": ("1y", "1d"),
+            "1y": ("1y", "1d"),
+            "5y": ("5y", "1wk"),
+            "max": ("max", "1mo"),
+        }
+        r_, i_ = rng_map.get(range_, ("6mo", "1d"))
+        if interval != "auto":
+            i_ = interval
+        df = yf.Ticker(symbol).history(period=r_, interval=i_, auto_adjust=False)
+        if df is None or df.empty:
+            return []
+        df = df.reset_index()
+        if range_ == "ytd":
+            year = pd.Timestamp.utcnow().year
+            df = df[df["Date"].dt.year == year]
+        pts = []
+        for _, row in df.iterrows():
+            ts = int(pd.Timestamp(row["Date"]).timestamp() * 1000)
+            close = row.get("Close")
+            if close is None:
+                continue
+            pts.append({
+                "t": ts,
+                "o": float(row.get("Open")) if pd.notna(row.get("Open")) else None,
+                "h": float(row.get("High")) if pd.notna(row.get("High")) else None,
+                "l": float(row.get("Low")) if pd.notna(row.get("Low")) else None,
+                "c": float(close) if pd.notna(close) else None,
+                "v": float(row.get("Volume")) if pd.notna(row.get("Volume")) else None,
+            })
+        return pts
+
+    # Try RapidAPI first; if empty, fall back to yfinance
+    source = "rapidapi"
+    pts = _try_rapidapi()
+    if not pts:
+        pts = _try_yfinance()
+        source = "yfinance" if pts else "none"
+
+    data = {"symbol": symbol, "points": pts}
+    _cache_put(ck, data)
+
+    # lightweight log so you can see what happened in the terminal
+    try:
+        print(f"OHLC {symbol} {range_} {interval}: {len(pts)} points via {source}")
+    except Exception:
+        pass
+
+    return data
+
+
 
 @app.route("/admin/flush-cache/<token>")
 def flush_cache(token):
@@ -500,6 +638,23 @@ def home():
 @app.route("/api/news")
 def get_news():
     return jsonify(fetch_ai_news())
+    
+# ---- replace your current /markets route with this ----
+@app.route("/markets", methods=["GET"], endpoint="markets_view")
+def markets_view():
+    return render_template("markets.html", title="Markets")
+
+# (optional but tidy) make the API endpoint name unique too
+@app.route("/api/ohlc/<symbol>", methods=["GET"], endpoint="api_ohlc")
+def api_ohlc_route(symbol):
+    range_ = request.args.get("range", "6mo")
+    interval = request.args.get("interval", "1d")
+    data = fetch_yahoo_chart(symbol, range_, interval)
+    from flask import jsonify
+    resp = jsonify(data)
+    resp.headers["Cache-Control"] = "public, max-age=300"
+    return resp
+  
 
 # --------------------------------------------------------------------------------------
 # Main
