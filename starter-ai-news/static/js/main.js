@@ -1,100 +1,93 @@
-document.addEventListener("DOMContentLoaded", () => {
-  const container = document.getElementById("news-container");
+// static/js/main.js
 
-  // Only allow EN or FR
-  let storedLang = localStorage.getItem("lang");
-  const allowedLangs = ["EN", "FR"];
-  if (!storedLang || !allowedLangs.includes(storedLang.toUpperCase())) {
-    storedLang = "EN";
-    localStorage.setItem("lang", storedLang);
-  } else {
-    storedLang = storedLang.toUpperCase();
+(function () {
+  const PREVIEW_LIMIT = 380;
+
+  // Robust preview: strip HTML, collapse whitespace, word-safe ellipsis
+  function textPreview(text, limit = PREVIEW_LIMIT) {
+    if (!text) return "";
+    const s = String(text);
+    const temp = document.createElement("div");
+    temp.innerHTML = s; // strip tags safely
+    const stripped = (temp.textContent || temp.innerText || "").replace(/\s+/g, " ").trim();
+    if (stripped.length <= limit) return stripped;
+    const cut = stripped.slice(0, limit);
+    const lastSpace = cut.lastIndexOf(" ");
+    return (lastSpace > 40 ? cut.slice(0, lastSpace) : cut) + "…";
   }
 
-  setSelectedLangLabel(storedLang);
-  loadNews(storedLang);
+  // Build a story card (used only if we *client*-render)
+  function makeCard(item, lang = "EN") {
+    const title = (item.title && (item.title[lang.toLowerCase()] || item.title.en)) || "";
+    const summaryRaw = (item.summary && (item.summary[lang.toLowerCase()] || item.summary.en)) || "";
+    const url = item.url || "#";
+    const categories = item.categories || [];
+    const tags = item.tags || [];
 
-  // Add event listeners to language menu
-  document.querySelectorAll(".lang-select").forEach(el => {
-    el.addEventListener("click", (e) => {
-      e.preventDefault();
-      const langElement = e.target.closest("[data-lang]");
-      if (!langElement) {
-        console.warn("Missing data-lang attribute on clicked item:", e.target);
-        return;
-      }
+    const card = document.createElement("div");
+    card.className = "col-md-6 story";
+    card.innerHTML = `
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title">${title}</h5>
+          <p class="card-text summary">${textPreview(summaryRaw)}</p>
+          <a class="btn btn-primary mt-1" target="_blank" rel="noopener">Read more</a>
+          <div class="mt-2"></div>
+        </div>
+      </div>
+    `;
+    card.querySelector("a").href = url;
 
-      const selectedLang = langElement.getAttribute("data-lang").toUpperCase();
-      if (!allowedLangs.includes(selectedLang)) {
-        console.warn("Invalid language selected:", selectedLang);
-        return;
-      }
-
-      localStorage.setItem("lang", selectedLang);
-      setSelectedLangLabel(selectedLang);
-      loadNews(selectedLang);
-    });
-  });
-
-  function setSelectedLangLabel(lang) {
-    const label = document.getElementById("selected-lang");
-    if (label) {
-      label.textContent = lang;
+    // Badges
+    const badges = card.querySelector(".mt-2");
+    const hasFinance = tags.includes("finance") || categories.map(c => String(c).toLowerCase()).includes("finance");
+    if (hasFinance) {
+      const b = document.createElement("span");
+      b.className = "badge bg-secondary me-1";
+      b.textContent = "Finance";
+      badges.appendChild(b);
     }
+    for (const c of categories) {
+      if (hasFinance && String(c).toLowerCase() === "finance") continue;
+      const b = document.createElement("span");
+      b.className = "badge bg-secondary me-1";
+      b.textContent = c;
+      badges.appendChild(b);
+    }
+    return card;
   }
 
-  function loadNews(lang) {
-    fetch("/api/news")
-      .then(res => res.json())
-      .then(data => {
-        container.innerHTML = "";
+  async function hydrateIfNeeded() {
+    const container = document.getElementById("news-container");
+    if (!container) return;
 
-        data.forEach(story => {
-          const card = document.createElement("div");
-          card.className = "col-md-6 mb-4";
-
-          const title =
-            story.title?.[lang] ||
-            story.title?.[lang.toLowerCase()] ||
-            story.title?.EN ||
-            story.title?.en ||
-            story.title?.FR ||
-            story.title?.fr ||
-            "Untitled";
-
-          const summary =
-            story.summary?.[lang] ||
-            story.summary?.[lang.toLowerCase()] ||
-            story.summary?.EN ||
-            story.summary?.en ||
-            story.summary?.FR ||
-            story.summary?.fr ||
-            "No summary available.";
-
-          card.innerHTML = `
-            <div class="card h-100">
-              <div class="card-body">
-                <div class="mb-2">
-                  ${(story.categories || []).map(cat => `
-                    <span class="badge bg-${getBadgeColor(cat)} me-1">${cat}</span>
-                  `).join('')}
-                </div>
-                <h5 class="card-title">${title}</h5>
-                <p class="card-text">${summary}</p>
-                <a href="${story.url}" class="btn btn-primary" target="_blank">Read more</a>
-              </div>
-            </div>`;
-          container.appendChild(card);
-        });
+    // If server already rendered cards, enforce clamp on them and exit.
+    const preRendered = container.querySelector(".card");
+    if (preRendered) {
+      container.querySelectorAll(".card .card-text").forEach(p => {
+        // Only touch if it's not already clamped or is suspiciously long
+        if (!p.classList.contains("summary") || (p.textContent && p.textContent.length > PREVIEW_LIMIT + 40)) {
+          p.textContent = textPreview(p.textContent);
+          p.classList.add("summary");
+        }
       });
-  }
+      return;
+    }
 
-  function getBadgeColor(category) {
-    switch (category) {
-      case "Model": return "info";
-      case "Company": return "success";
-      case "Agent AI": return "warning";
-      default: return "secondary";
+    // Otherwise, client-render from /api/news (shape: either {items:[...]} or [...] )
+    try {
+      const res = await fetch("/api/news", { cache: "no-store" });
+      const data = await res.json();
+      const items = Array.isArray(data) ? data : (data.items || []);
+      const lang = (localStorage.getItem("lang") || "EN").toUpperCase();
+
+      const frag = document.createDocumentFragment();
+      for (const item of items) frag.appendChild(makeCard(item, lang));
+      container.appendChild(frag);
+    } catch (e) {
+      console.warn("Failed to hydrate news:", e);
     }
   }
-});
+
+  document.addEventListener("DOMContentLoaded", hydrateIfNeeded);
+})();
