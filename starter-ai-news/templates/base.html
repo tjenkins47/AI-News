@@ -28,6 +28,8 @@
   </style>
 
   {% block extra_head %}{% endblock %}
+  
+
 </head>
 <body>
   <!-- Dark site-wide navbar (now sticky) -->
@@ -49,16 +51,17 @@
                href="{{ url_for('markets_view') }}">Markets</a>
           </li>
           <!-- Language dropdown (ready for FR later) -->
-          <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle" href="#" id="langMenu" role="button"
-               data-bs-toggle="dropdown" aria-expanded="false">
-              {{ session.get('lang', 'EN') }}
-            </a>
-            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="langMenu">
-              <li><a class="dropdown-item" href="/set_lang?lang=en">EN</a></li>
-              <li><a class="dropdown-item" href="/set_lang?lang=fr">FR</a></li>
-            </ul>
-          </li>
+            {% if not hide_lang %}
+            <li class="nav-item d-flex align-items-center">
+              <a class="nav-link {% if current_lang=='EN' %}active{% endif %}" 
+                 href="{{ url_for('set_lang', lang='en') }}">EN</a>
+              <span class="text-secondary">|</span>
+              <a class="nav-link {% if current_lang=='FR' %}active{% endif %}" 
+                 href="{{ url_for('set_lang', lang='fr') }}">FR</a>
+            </li>
+            {% endif %}
+
+
         </ul>
       </div>
     </div>
@@ -67,6 +70,8 @@
   <main class="container py-4">
     {% block content %}{% endblock %}
   </main>
+  
+    <script>window.CURRENT_LANG = "{{ current_lang }}";</script>  
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   {% block page_scripts %}{% endblock %}

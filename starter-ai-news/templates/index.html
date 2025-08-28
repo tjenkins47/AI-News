@@ -34,12 +34,13 @@
         <div class="card h-100">
           <div class="card-body">
             <!-- Titles -->
-            <h5 class="card-title story-en">{{ item.title.en }}</h5>
-            <h5 class="card-title story-fr" style="display:none;">{{ item.title.fr }}</h5>
+            <h5 class="card-title">
+              {{ (item.title.fr if current_lang=='FR' else item.title.en) }}
+            </h5>
 
-            <!-- Summaries (strip HTML, normalize newlines, hard truncate, then CSS clamp) -->
-            <p class="card-text summary story-en">{{ item.summary.en | preview(380) }}</p>
-            <p class="card-text summary story-fr" style="display:none;">{{ item.summary.fr | preview(380) }}</p>
+            <p class="card-text summary">
+              {{ (item.summary.fr if current_lang=='FR' else item.summary.en) | preview(380) }}
+            </p>
 
 
             <a href="{{ item.url }}" class="btn btn-primary mt-1" target="_blank" rel="noopener">Read more</a>
