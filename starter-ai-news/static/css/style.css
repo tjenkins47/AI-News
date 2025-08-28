@@ -1,1 +1,32 @@
-body { padding-top: 80px; }
+.navbar .nav-link {
+  color: white !important;
+  font-weight: 500;
+}
+
+.navbar-brand {
+  color: white !important;
+  font-weight: bold;
+}
+
+/* Force perfect vertical centering for all nav links, everywhere */
+.navbar.navbar-dark .navbar-nav .nav-link {
+  display: flex !important;
+  align-items: center !important;
+  height: 48px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  line-height: 1 !important;
+}
+
+/* Generic clamp for story previews (works with/without WebKit support) */
+.summary{
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:4;  /* show ~4 lines */
+  overflow:hidden;
+  white-space:normal;
+  line-height:1.25rem;
+  max-height:calc(1.25rem * 4);
+  word-break:break-word;
+  overflow-wrap:anywhere;
+}
