@@ -7,11 +7,13 @@ from datetime import datetime, timezone
 from typing import List, Dict, Any, Iterable
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    # In prod, python-dotenv may not be installed; that's fine.
+    pass
 
-# --------------------------------------------------------------------------------------
-# App / env
-# --------------------------------------------------------------------------------------
-load_dotenv()
 app = Flask(__name__)
 
 # Logging
@@ -25,7 +27,14 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "").strip()
 TRANSLATE_ENABLED = os.getenv("TRANSLATE_ENABLED", "0").strip() in ("1", "true", "True", "yes", "on")
 
 # Session secret (needed for language toggle)
-app.secret_key = os.getenv("SECRET_KEY", "dev-secret-change-me")
+# Use env key if provided; otherwise generate a temporary one so the app doesn't 500.
+secret_from_env = os.getenv("SECRET_KEY")
+if secret_from_env:
+    app.secret_key = secret_from_env
+else:
+    app.secret_key = os.urandom(32)
+    app.logger.warning("SECRET_KEY not set; generated a temporary key for this process.")
+
 
 # Static cache-bust
 CACHE_VERSION = int(os.getenv("CACHE_VERSION", "5"))
