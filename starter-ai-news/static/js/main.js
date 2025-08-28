@@ -79,8 +79,7 @@
       const res = await fetch("/api/news", { cache: "no-store" });
       const data = await res.json();
       const items = Array.isArray(data) ? data : (data.items || []);
-      const lang = (localStorage.getItem("lang") || "EN").toUpperCase();
-
+      const lang = (window.CURRENT_LANG || "EN").toUpperCase();
       const frag = document.createDocumentFragment();
       for (const item of items) frag.appendChild(makeCard(item, lang));
       container.appendChild(frag);
