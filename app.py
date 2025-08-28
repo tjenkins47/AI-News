@@ -16,6 +16,18 @@ except Exception:
 
 app = Flask(__name__)
 
+# Language toggle — guaranteed endpoint name
+@app.route("/set_lang", methods=["GET"], endpoint="set_lang")
+def set_lang_route():
+    from flask import request, session, redirect, url_for
+    lang = (request.args.get("lang", "en") or "en").lower()
+    if lang not in ("en", "fr"):
+        lang = "en"
+    session["lang"] = lang.upper()
+    nxt = request.args.get("next") or request.referrer or url_for("home")
+    return redirect(nxt)
+
+
 # Logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("ai-news")
