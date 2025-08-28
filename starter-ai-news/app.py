@@ -3,7 +3,7 @@
 
 import os, time
 import json
-import re
+import re, html
 import difflib
 import urllib.parse
 import datetime as dt
@@ -31,9 +31,17 @@ NEWSDATA_API_KEY = os.getenv("NEWSDATA_API_KEY", "").strip()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "").strip()
 TRANSLATE_ENABLED = os.getenv("TRANSLATE_ENABLED", "0").strip() in ("1", "true", "True", "yes", "on")
 
-CACHE_VERSION = "v2-badges-2"  # bump this whenever schema/tags change
+import os
+CACHE_VERSION = int(os.getenv("CACHE_VERSION", "4"))  # Change this number whenever making big changes.
+
+@app.context_processor
+def inject_cache_bust():
+    return {"cache_bust": CACHE_VERSION}
+
 DATA_DIR = "data"
 NEWS_CACHE_PATH = os.path.join(DATA_DIR, f"news_cache_{CACHE_VERSION}.json")
+NEWSDATA_COOLDOWN_SEC = 15 * 60  # 15 minutes
+_newsd_cooldown_until = 0
 
 # optional: lightweight admin flush to clear cache on Railway
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")  # set this in Railway variables
@@ -41,6 +49,16 @@ ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")  # set this in Railway variables
 # -------- Simple per-key TTL cache (10 min) --------
 _CACHE = {}
 _CACHE_TTL_SEC = 10 * 60
+
+def _set_newsd_cooldown():
+    _CACHE["newsd_cooldown_until"] = (time.time(), time.time() + NEWSDATA_COOLDOWN_SEC)
+
+def newsdata_on_cooldown():
+    rec = _CACHE.get("newsd_cooldown_until")
+    if not rec: return False
+    _, until_ts = rec
+    return time.time() < until_ts
+
 
 def _cache_get(key):
     rec = _CACHE.get(key)
@@ -50,6 +68,62 @@ def _cache_get(key):
 
 def _cache_put(key, data):
     _CACHE[key] = (time.time(), data)
+    
+def newsdata_on_cooldown() -> bool:
+    return time.time() < _newsd_cooldown_until
+    
+@app.template_filter('preview')
+def preview(text, limit=380):
+    """
+    Strip HTML, collapse whitespace, and truncate with a word-safe ellipsis.
+    Returns a plain string (safe to render).
+    """
+    if not text:
+        return ""
+    s = str(text)
+    s = re.sub(r"<[^>]+>", " ", s)          # strip tags
+    s = html.unescape(s)                     # decode entities
+    s = re.sub(r"\s+", " ", s).strip()       # collapse whitespace
+    if len(s) <= limit:
+        return s
+    cut = s[:limit].rsplit(" ", 1)[0]        # avoid mid-word cut
+    return f"{cut}…"
+    
+
+def newsdata_get(url: str, params: dict):
+    """
+    Wrapper around requests.get for NewsData.io that:
+    - skips calls while in cooldown
+    - starts cooldown on HTTP 429
+    - logs concise messages
+    Returns parsed JSON dict on success, or None on skip/error.
+    """
+    global _newsd_cooldown_until
+
+    if newsdata_on_cooldown():
+        app.logger.info("NewsData: on cooldown; skipping call.")
+        return None
+
+    try:
+        r = requests.get(url, params=params, timeout=20)
+    except Exception as e:
+        app.logger.warning(f"NewsData network error: {e}")
+        return None
+
+    if r.status_code == 429:
+        _newsd_cooldown_until = time.time() + NEWSDATA_COOLDOWN_SEC
+        app.logger.warning("NewsData 429 rate limit — cooling down for %d sec.", NEWSDATA_COOLDOWN_SEC)
+        return None
+
+    if r.status_code >= 400:
+        app.logger.warning("NewsData HTTP %s: %s", r.status_code, r.text[:200])
+        return None
+
+    try:
+        return r.json()
+    except Exception:
+        app.logger.warning("NewsData: failed to parse JSON.")
+        return None    
     
 def fetch_yahoo_chart(symbol: str, range_: str, interval: str):
     """
