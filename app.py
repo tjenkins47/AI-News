@@ -1,42 +1,23 @@
 # app.py — AI News v2 (AI + Finance)
-# Cleanups: remove duplicate /markets route, unify NewsData cooldown, single cache path,
-# fix set_lang redirect, keep preview filter & Chart API.
+# Cleanups: remove duplicate /set_lang route, keep preview filter & Chart API,
+# unify NewsData cooldown, single cache path, safe dotenv load.
 
 import os, time, json, re, html, difflib, urllib.parse, datetime as dt, logging, requests
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Iterable
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
-from dotenv import load_dotenv
+
+# --- Optional: load .env locally; safe if python-dotenv isn't installed in prod ---
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except Exception:
-    # In prod, python-dotenv may not be installed; that's fine.
     pass
 
+# --------------------------------------------------------------------------------------
+# App / env
+# --------------------------------------------------------------------------------------
 app = Flask(__name__)
-
-# Language toggle — guaranteed endpoint name
-@app.route("/set_lang", methods=["GET"], endpoint="set_lang")
-def set_lang_route():
-    from flask import request, session, redirect, url_for
-    lang = (request.args.get("lang", "en") or "en").lower()
-    if lang not in ("en", "fr"):
-        lang = "en"
-    session["lang"] = lang.upper()
-    nxt = request.args.get("next") or request.referrer or url_for("home")
-    return redirect(nxt)
-
-
-# Logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-log = logging.getLogger("ai-news")
-
-# API Keys / Flags
-GNEWS_API_KEY = os.getenv("GNEWS_API_KEY", "").strip()
-NEWSDATA_API_KEY = os.getenv("NEWSDATA_API_KEY", "").strip()
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "").strip()
-TRANSLATE_ENABLED = os.getenv("TRANSLATE_ENABLED", "0").strip() in ("1", "true", "True", "yes", "on")
 
 # Session secret (needed for language toggle)
 # Use env key if provided; otherwise generate a temporary one so the app doesn't 500.
@@ -47,6 +28,15 @@ else:
     app.secret_key = os.urandom(32)
     app.logger.warning("SECRET_KEY not set; generated a temporary key for this process.")
 
+# Logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+log = logging.getLogger("ai-news")
+
+# API Keys / Flags
+GNEWS_API_KEY = os.getenv("GNEWS_API_KEY", "").strip()
+NEWSDATA_API_KEY = os.getenv("NEWSDATA_API_KEY", "").strip()
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "").strip()
+TRANSLATE_ENABLED = os.getenv("TRANSLATE_ENABLED", "0").strip() in ("1", "true", "True", "yes", "on")
 
 # Static cache-bust
 CACHE_VERSION = int(os.getenv("CACHE_VERSION", "5"))
@@ -83,19 +73,16 @@ def _cache_put(key, data):
     _CACHE[key] = (time.time(), data)
 
 # --------------------------------------------------------------------------------------
-# Language toggle
+# Language toggle — single canonical route
 # --------------------------------------------------------------------------------------
-# Language toggle — guaranteed endpoint name
 @app.route("/set_lang", methods=["GET"], endpoint="set_lang")
-def set_lang_route():
-    from flask import request, session, redirect, url_for
+def set_lang():
     lang = (request.args.get("lang", "en") or "en").lower()
     if lang not in ("en", "fr"):
         lang = "en"
     session["lang"] = lang.upper()
     nxt = request.args.get("next") or request.referrer or url_for("home")
     return redirect(nxt)
-
 
 # --------------------------------------------------------------------------------------
 # Template filters
@@ -219,7 +206,7 @@ def fetch_yahoo_chart(symbol: str, range_: str, interval: str):
             import yfinance as yf
             import pandas as pd
         except Exception:
-            return []  # yfinance not installed locally
+            return []  # yfinance not installed locally / in lean prod
         rng_map = {
             "1d": ("1d", "5m"),
             "5d": ("5d", "15m"),
