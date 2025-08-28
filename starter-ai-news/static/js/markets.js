@@ -1,8 +1,13 @@
-// Markets page script — expects Chart.js UMD + date-fns adapter loaded in the HTML.
+// Markets page script — Chart.js UMD + date-fns adapter must be loaded by markets.html
 
-const SYMBOL = 'TSM';
-const state = { range: 'ytd', interval: '1d', chart: null };
+const state = {
+  symbol: 'TSM',
+  range: 'ytd',
+  interval: '1d',
+  chart: null
+};
 
+const titleEl = document.getElementById('symbolTitle');
 const canvas = document.getElementById('tsmChart');
 const ctx = canvas.getContext('2d');
 
@@ -13,42 +18,33 @@ function makeGradient() {
   g.addColorStop(1, 'rgba(0, 123, 255, 0.00)');
   return g;
 }
-
-function pickTimeUnit(range) {
-  if (range === '1d' || range === '5d') return 'hour';
-  if (['1mo', '6mo', 'ytd', '1y'].includes(range)) return 'day';
-  if (range === '5y') return 'month';
-  return 'year';
-}
-function pickTooltipFormat(range) {
-  if (range === '1d' || range === '5d') return "MMM d, h:mmaaa";
-  if (['1mo', '6mo', 'ytd', '1y'].includes(range)) return "MMM d, yyyy";
-  return "MMM yyyy";
-}
+const pickTimeUnit = (r) =>
+  (r === '1d' || r === '5d') ? 'hour' :
+  (['1mo','6mo','ytd','1y'].includes(r) ? 'day' :
+   (r === '5y' ? 'month' : 'year'));
+const pickTooltipFormat = (r) =>
+  (r === '1d' || r === '5d') ? "MMM d, h:mmaaa" :
+  (['1mo','6mo','ytd','1y'].includes(r) ? "MMM d, yyyy" : "MMM yyyy");
 
 async function fetchPoints() {
-  const url = `/api/ohlc/${SYMBOL}?range=${state.range}&interval=${state.interval}`;
+  const url = `/api/ohlc/${state.symbol}?range=${state.range}&interval=${state.interval}`;
   const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
-
-  // Convert to {x, y} points for Chart.js time scale
   const pts = (json.points || [])
     .filter(p => Number.isFinite(p.t) && Number.isFinite(p.c))
     .map(p => ({ x: +p.t, y: +p.c }));
-
-  console.log(`Fetched ${pts.length} points for ${SYMBOL} (${state.range}/${state.interval})`);
+  console.log(`Fetched ${pts.length} points for ${state.symbol} (${state.range}/${state.interval})`);
   return pts;
 }
 
 function buildChart(pts) {
   if (state.chart) state.chart.destroy();
-
   state.chart = new Chart(ctx, {
     type: 'line',
     data: {
       datasets: [{
-        label: `${SYMBOL} price`,
+        label: `${state.symbol} price`,
         data: pts,
         borderWidth: 2,
         borderColor: 'rgba(0, 123, 255, 1)',
@@ -64,7 +60,7 @@ function buildChart(pts) {
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: c => ` $${c.parsed.y?.toFixed(2)}` } }
+        tooltip: { callbacks: { label: (c) => ` $${c.parsed.y?.toFixed(2)}` } }
       },
       scales: {
         x: {
@@ -109,5 +105,16 @@ document.querySelectorAll('.range-btn').forEach(btn => {
   });
 });
 
-// Initial draw when the DOM is ready
+// Symbol pills
+document.querySelectorAll('.symbol-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    document.querySelectorAll('.symbol-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.symbol = btn.dataset.symbol;
+    titleEl.textContent = state.symbol;
+    await refresh();
+  });
+});
+
+// Initial draw
 document.addEventListener('DOMContentLoaded', refresh);
