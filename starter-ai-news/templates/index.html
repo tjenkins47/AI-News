@@ -1,38 +1,84 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI News Feed</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
-  <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
-    <div class="container-fluid">
-      <a class="navbar-brand fw-bold" href="#">AI News</a>
-      <div class="collapse navbar-collapse justify-content-end">
-        <ul class="navbar-nav">
-          <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle" href="#" id="langDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-              <span id="selected-lang">EN</span>
-            </a>
-            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="langDropdown">
-              <li><a class="dropdown-item lang-select" href="#" data-lang="EN">English</a></li>
-              <li><a class="dropdown-item lang-select" href="#" data-lang="FR">Français</a></li>
-            </ul>
-          </li>
-        </ul>
+{% extends "base.html" %}
+{% set title = "AI News Feed" %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ cache_bust }}">
+
+<style>
+  /* Robust multi-line clamp with a fallback */
+  .line-clamp-4 {
+    /* primary clamp */
+    display: -webkit-box !important;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    overflow: hidden !important;
+    white-space: normal !important;   /* override any pre-wrap from global CSS */
+  }
+  /* Fallback when -webkit-line-clamp isn't supported */
+  @supports not (-webkit-line-clamp: 1) {
+    .line-clamp-4 {
+      display: block !important;
+      line-height: 1.25rem;
+      max-height: calc(1.25rem * 4);
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+  <h1 class="mb-4">Top Stories in AI</h1>
+
+  <div id="news-container" class="row g-4">
+    {% for item in news_items %}
+      <div class="col-md-6 story">
+        <div class="card h-100">
+          <div class="card-body">
+            <!-- Titles -->
+            <h5 class="card-title story-en">{{ item.title.en }}</h5>
+            <h5 class="card-title story-fr" style="display:none;">{{ item.title.fr }}</h5>
+
+            <!-- Summaries (strip HTML, normalize newlines, hard truncate, then CSS clamp) -->
+            <p class="card-text summary story-en">{{ item.summary.en | preview(380) }}</p>
+            <p class="card-text summary story-fr" style="display:none;">{{ item.summary.fr | preview(380) }}</p>
+
+
+            <a href="{{ item.url }}" class="btn btn-primary mt-1" target="_blank" rel="noopener">Read more</a>
+
+            <!-- Badges -->
+            <div class="mt-2">
+              {% set has_finance = (item.tags is defined and item.tags and 'finance' in item.tags) or ('finance' in (item.categories or [])) %}
+              {% if has_finance %}
+                <span class="badge bg-secondary me-1">Finance</span>
+              {% endif %}
+              {% for category in item.categories %}
+                {% if not (has_finance and (category|lower == 'finance')) %}
+                  <span class="badge bg-secondary">{{ category }}</span>
+                {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
-  </nav>
+    {% endfor %}
+  </div>
+{% endblock %}
 
-  <main class="container mt-5 pt-5">
-    <h1 class="mb-4">Top Stories in AI</h1>
-    <div id="news-container" class="row"></div>
-  </main>
-
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% block page_scripts %}
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-</body>
-</html>
+  <script>
+    // EN/FR switch (kept for when FR returns)
+    document.addEventListener("DOMContentLoaded", () => {
+      const lang = localStorage.getItem("lang") || "EN";
+      setLanguage(lang);
+    });
+    function setLanguage(lang) {
+      const sel = document.getElementById("selected-lang");
+      if (sel) sel.textContent = lang;
+      document.querySelectorAll(".story").forEach(story => {
+        story.querySelectorAll(".story-en").forEach(el => el.style.display = (lang === "EN") ? "block" : "none");
+        story.querySelectorAll(".story-fr").forEach(el => el.style.display = (lang === "FR") ? "block" : "none");
+      });
+    }
+  </script>
+{% endblock %}
