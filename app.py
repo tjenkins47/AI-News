@@ -73,14 +73,17 @@ def _cache_put(key, data):
 # --------------------------------------------------------------------------------------
 # Language toggle
 # --------------------------------------------------------------------------------------
-@app.get("/set_lang")
-def set_lang():
+# Language toggle — guaranteed endpoint name
+@app.route("/set_lang", methods=["GET"], endpoint="set_lang")
+def set_lang_route():
+    from flask import request, session, redirect, url_for
     lang = (request.args.get("lang", "en") or "en").lower()
     if lang not in ("en", "fr"):
         lang = "en"
     session["lang"] = lang.upper()
     nxt = request.args.get("next") or request.referrer or url_for("home")
     return redirect(nxt)
+
 
 # --------------------------------------------------------------------------------------
 # Template filters
