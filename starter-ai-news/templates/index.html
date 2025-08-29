@@ -1,48 +1,47 @@
 {% extends "base.html" %}
-{% set title = "AI News Feed" %}
+
+{% block title %}AI News — Home{% endblock %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ cache_bust }}">
+<style>
+  .source { opacity:.85; }
+  .btn-read { border-color: rgba(255,255,255,.35); }
+</style>
 {% endblock %}
 
 {% block content %}
-  <h1 class="mb-4">Top Stories in AI</h1>
+  <div class="hero mb-2">
+    <h1 class="h3 mb-0">Latest AI Stories</h1>
+  </div>
 
-  {% if news_items and news_items|length > 0 %}
-    <div id="news-container" class="row g-4">
-      {% for item in news_items %}
-        <div class="col-md-6 story">
-          <div class="card h-100">
-            <div class="card-body">
-              <h5 class="card-title">
-                {{ (item.title.fr if current_lang=='FR' else item.title.en) }}
-              </h5>
-              <p class="card-text summary">
-                {{ (item.summary.fr if current_lang=='FR' else item.summary.en) | preview(380) }}
-              </p>
-              <a href="{{ item.url }}" class="btn btn-primary mt-1" target="_blank" rel="noopener">Read more</a>
-              <div class="mt-2">
-                {% set has_finance = (item.tags is defined and item.tags and 'finance' in item.tags) or ('finance' in (item.categories or [])) %}
-                {% if has_finance %}<span class="badge bg-secondary me-1">Finance</span>{% endif %}
-                {% for category in item.categories %}
-                  {% if not (has_finance and (category|lower == 'finance')) %}
-                    <span class="badge bg-secondary">{{ category }}</span>
-                  {% endif %}
-                {% endfor %}
-              </div>
-            </div>
+  <div class="row g-3 py-2">
+    {% for item in stories %}
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="card h-100">
+        {% if item.image %}<img src="{{ item.image }}" class="card-img-top" alt="">{% endif %}
+        <div class="card-body d-flex flex-column">
+          <div class="mb-2">
+            <span class="source small">{{ item.source }}</span>
+            {% if item.published_at %}<span class="small ms-2">{{ item.published_at }}</span>{% endif %}
+          </div>
+          <h2 class="h6 mb-2">
+            <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.title }}</a>
+          </h2>
+          {% set excerpt = (item.summary or item.content or item.title) %}
+          {% if excerpt %}
+            <p class="card-text flex-grow-1">{{ excerpt | truncate(260) }}</p>
+          {% else %}
+            <p class="card-text flex-grow-1 text-secondary">No summary available.</p>
+          {% endif %}
+          <div class="mt-2">
+            {% for b in item.badges %}<span class="badge me-1">{{ b }}</span>{% endfor %}
+          </div>
+          <div class="mt-3">
+            <a class="btn btn-outline-light btn-sm btn-read" href="{{ item.url }}" target="_blank" rel="noopener noreferrer">Read story</a>
           </div>
         </div>
-      {% endfor %}
+      </div>
     </div>
-  {% else %}
-    <div class="alert alert-info">
-      We’re temporarily out of fresh stories due to source rate limits. Please try again later,
-      or check <a href="/markets" class="alert-link">Markets</a> in the meantime.
-    </div>
-  {% endif %}
-{% endblock %}
-
-{% block page_scripts %}
-  <script src="{{ url_for('static', filename='js/main.js') }}?v={{ cache_bust }}"></script>
+    {% endfor %}
+  </div>
 {% endblock %}
